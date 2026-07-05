@@ -82,6 +82,7 @@ object AppModule {
                         label = app.label,
                         strategy = app.handoffStrategy,
                         urlTemplate = app.urlTemplate,
+                        searchActivity = app.searchActivity,
                     )
                 )
             }
