@@ -201,16 +201,29 @@ private fun ResultCard(
     modifier: Modifier = Modifier,
 ) {
     val cardShape = RoundedCornerShape(12.dp)
+    val colorScheme = MaterialTheme.colorScheme
     Surface(
         onClick = onClick,
         // No fixed width: the grid cell drives the card width (~5 across on the 960dp canvas).
         modifier = modifier,
         shape = ClickableSurfaceDefaults.shape(cardShape),
+        // Keep the card DARK in both states (default + focused) so text stays readable. By
+        // default a clickable Surface flips to a light focusedContainerColor, which produced
+        // white text on a white background on focus. We signal focus via scale + border only,
+        // and pin container/content colors dark for every state.
+        colors = ClickableSurfaceDefaults.colors(
+            containerColor = colorScheme.surfaceVariant,
+            contentColor = colorScheme.onSurface,
+            focusedContainerColor = colorScheme.surfaceVariant,
+            focusedContentColor = colorScheme.onSurface,
+            pressedContainerColor = colorScheme.surfaceVariant,
+            pressedContentColor = colorScheme.onSurface,
+        ),
         // Obvious focus state required by TV UX: scale up + brand-colored border on focus.
         scale = ClickableSurfaceDefaults.scale(focusedScale = 1.1f),
         border = ClickableSurfaceDefaults.border(
             focusedBorder = Border(
-                border = BorderStroke(3.dp, MaterialTheme.colorScheme.primary),
+                border = BorderStroke(3.dp, colorScheme.primary),
                 shape = cardShape,
             ),
         ),
