@@ -64,6 +64,45 @@ class SearchActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        setContent {
+            OpenTvSearchTheme {
+                val state by viewModel.state.collectAsStateWithLifecycle()
+                SearchScreen(
+                    state = state,
+                    onQueryChange = viewModel::onQueryChange,
+                    onSubmit = viewModel::submit,
+                    onVoice = ::startVoiceFlow,
+                    onResultClick = ::launchResult,
+                )
+            }
+        }
+
+        // Request READ_TV_LISTINGS so the TV-Provider source can read other apps' rows.
+        if (!hasPermission(TvProviderSearchSource.PERMISSION_READ_TV_LISTINGS)) {
+            tvListingsPermission.launch(TvProviderSearchSource.PERMISSION_READ_TV_LISTINGS)
+        }
+
+        handleSearchIntent(intent)
+    }
+
+    /**
+     * The activity is `singleTop`, so a SEARCH/ASSIST intent delivered to an already-running
+     * instance goes to [onNewIntent], NOT [onCreate]. Route both through here so a repeated
+     * remote-search press re-applies the incoming query and re-evaluates the voice auto-launch.
+     */
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleSearchIntent(intent)
+    }
+
+    /**
+     * Apply an incoming ACTION_SEARCH / GMS SEARCH_ACTION / ACTION_ASSIST intent: seed + submit
+     * any query it carries, then decide whether to auto-launch the voice recognizer. A NEW intent
+     * is allowed to fire voice again (desired for a repeated remote-search press); the launch fires
+     * at most once per intent because this runs once per delivered intent.
+     */
+    private fun handleSearchIntent(intent: Intent?) {
         // Handle an incoming ACTION_SEARCH / GMS SEARCH_ACTION / ACTION_ASSIST
         // (remote button / global search / assistant-style "search this app").
         val incomingQuery = when (intent?.action) {
@@ -78,27 +117,9 @@ class SearchActivity : ComponentActivity() {
         // search (with or without a query), as opposed to a plain launcher open.
         val isSearchIntent = intent?.action in SEARCH_INTENT_ACTIONS
 
-        setContent {
-            OpenTvSearchTheme {
-                val state by viewModel.state.collectAsStateWithLifecycle()
-                SearchScreen(
-                    state = state,
-                    onQueryChange = viewModel::onQueryChange,
-                    onSubmit = viewModel::submit,
-                    onVoice = ::startVoiceFlow,
-                    onResultClick = ::launchResult,
-                )
-            }
-        }
-
         if (incomingQuery.isNotBlank()) {
             viewModel.onQueryChange(incomingQuery)
             viewModel.submit() // show hand-off results immediately, even before permission
-        }
-
-        // Request READ_TV_LISTINGS so the TV-Provider source can read other apps' rows.
-        if (!hasPermission(TvProviderSearchSource.PERMISSION_READ_TV_LISTINGS)) {
-            tvListingsPermission.launch(TvProviderSearchSource.PERMISSION_READ_TV_LISTINGS)
         }
 
         lifecycleScope.launch {
