@@ -1,95 +1,154 @@
 # OpenTVSearch
 
-Open-source universal content search for Android / Google TV. Type or **speak** a
-query and find movies, shows, and clips across the content apps you actually use —
-then jump straight into the app that has it. Remote-button-mappable, voice-first,
-and fully configurable.
+**Universal, voice-first content search for Android TV / Google TV.**
 
-> Status: **v0.1 scaffold.** Architecture + entry points + the core `SearchSource`
-> abstraction are in place; source adapters and the Compose-for-TV UI are stubbed
-> with `TODO(v1)` markers. See [Roadmap](#roadmap).
+OpenTVSearch is an open-source app that lets you search *across the content apps you already have
+installed* — Stremio, Nova, Netflix, YouTube, Jellyfin, Kodi, Plex and more — from one screen,
+mappable to a remote button and driven by voice. Instead of opening each app and searching
+separately, you type or speak once and OpenTVSearch aggregates what it can and hands off to the
+right app for the rest.
+
+> Status: **early / Milestone 1.** Core search, aggregation, voice, and a TV-native UI work and
+> are verified on real hardware (Skyworth HP4609, Android 14). Settings UI and richer per-app
+> integrations are in progress — see [Roadmap](#roadmap).
+
+---
+
+## Why
+
+Google TV's built-in search only surfaces results from Google's *partner* apps (Netflix, YouTube,
+Prime…). Community and self-hosted apps (Stremio, Nova, Jellyfin, Kodi, SmartTube…) are invisible
+to it, and there's no user-configurable way to add them. OpenTVSearch is the open alternative: it
+reads what the platform *does* expose across all apps, and falls back to a clean per-app hand-off
+for the rest — no root, no partner agreement, installable by anyone.
 
 ## Platform reality (read this first)
 
-There is **no** Android API that lets a sideloaded app read the *full internal
-catalog* of a closed app like Netflix. That is a hard platform limit — confirmed
-against AOSP source, not a design shortcut. What **is** supported, and what this app
-is built on:
+There is **no** Android API that lets a sideloaded app read the *full internal catalog* of a
+closed app like Netflix. That is a hard platform limit — confirmed against AOSP source, not a
+design shortcut. OpenTVSearch is therefore a **hybrid federated-search + hand-off** tool: deep
+results where the platform allows reading, one-press hand-off everywhere else. What's actually
+supported:
 
 | Mechanism | What you get | Coverage |
 |---|---|---|
-| **TV Provider searchable rows** (`READ_TV_LISTINGS`, API 26+) | Real items other apps published to the home screen and marked `COLUMN_SEARCHABLE=1`: title, poster, play-deep-link, type | Whatever each app chooses to publish (recommendation / Watch Next rows) — **not** full catalogs |
+| **TV Provider searchable rows** (`READ_TV_LISTINGS`, API 26+) | Items other apps published to the home screen: title, poster, play deep-link, type | Whatever each app publishes (recommendation / Watch Next rows) — **not** full catalogs |
 | **Open-app APIs** (Jellyfin REST, Kodi JSON-RPC, Plex, Stremio addons) | True inline result lists from servers/addons the user configures | Full, for those apps |
-| **Search deep-link hand-off** (`ACTION_SEARCH`, URL schemes) | Opens the target app **pre-filled** with the query | Any app with a search intent (Netflix, YouTube, Nova, ...) |
+| **Search deep-link hand-off** (`ACTION_SEARCH`, URL schemes) | Opens the target app — with the query where the app honors it, else just launched | Any installed app; query support is per-app (see below) |
 
-So OpenTVSearch is a **hybrid federated search + hand-off** tool: deep results where
-the platform allows reading, one-press hand-off everywhere else. This is the best any
-third-party app can do on the platform, and the app is honest about it in the UI
-(INLINE vs HANDOFF results).
+The app is honest about this split in the UI: **INLINE** results are playable deep-links; **HANDOFF**
+results open an app.
 
-The stock Google TV search covers *Google's partner streamers* via server-side feeds;
-it does **not** cover sideloaded/open apps (Stremio, Nova, Jellyfin, Kodi, self-hosted)
-and isn't configurable. That gap is what this app fills.
+## What it does today (Milestone 1)
+
+- **One search box, many sources.** A query fans out in parallel to every enabled source with a
+  per-source timeout, and results are merged (playable/INLINE results ranked ahead of hand-offs).
+- **Cross-app content via `READ_TV_LISTINGS`.** Reads the TV Provider `preview_programs` /
+  `watch_next_programs` tables — the same home-screen recommendation rows Google TV's own search
+  uses — so results carry real posters and play deep-links where apps publish them.
+- **Honest per-app hand-off.** For apps whose catalog can't be read, OpenTVSearch offers a card
+  that opens that app. Where an app genuinely honors an external query (e.g. **Nova**, via its
+  search activity) the card runs a real in-app search; where it doesn't, the card is labeled
+  *"Open X to search"* rather than pretending. (See [App support](#app-support).)
+- **Voice-first, remote-mappable.** Launch it via a remote "search" button or the system search
+  key and it opens straight into voice input; an on-screen mic works too. An optional
+  *voice-on-launch* setting fires the recognizer as soon as the app opens.
+- **TV-native UI.** Built with Compose for TV (Material 3 for TV): overscan-safe layout,
+  D-pad focus with scale + border indicators, dark theme tuned for 10-foot viewing.
+
+## App support
+
+Hand-off behavior is **device-tested**, not assumed — an app advertising a search intent in its
+manifest often ignores an externally-supplied query. Verified on Skyworth HP4609 (Android 14):
+
+| App | External search | Behavior |
+|-----|-----------------|----------|
+| **Nova Video Player** (`org.courville.nova`) | ✅ Real search | Opens its query browser with your term and shows library results |
+| **Stremio** (`com.stremio.one`) | ⚠️ Launch-only | Ignores external queries; opens to home. Card = *"Open Stremio to search"* |
+| **Netflix** (`com.netflix.ninja`) | ⚠️ Launch-only | Declares no search deep-link; card opens the app |
+| **YouTube TV** (`com.google.android.youtube.tv`) | ⚠️ Launch-only | No external search intent; card opens the app |
+| **Jellyfin / Kodi / Plex** | ⚠️ Launch-only* | Conservative default until verified on a device |
+| **Any app publishing TV-Provider rows** | ✅ via `READ_TV_LISTINGS` | Real posters + play deep-links, no per-app code needed |
+
+\* If you verify a working query-carrying strategy for one of these on real hardware, PRs welcome —
+see [Contributing](#contributing).
+
+## Requirements
+
+- Android TV / Google TV device or emulator, **Android 8.0 (API 26)+**.
+- The app requests two runtime permissions: `READ_TV_LISTINGS` (to read other apps'
+  recommendation rows) and `RECORD_AUDIO` (for voice search). Both are optional to grant; the app
+  degrades gracefully without them.
+
+## Build & install
+
+```bash
+# Prereqs: Android SDK, JDK 17. Set ANDROID_HOME.
+export ANDROID_HOME=/path/to/android-sdk
+
+# Build the debug APK
+./gradlew :app:assembleDebug
+
+# Install to a connected device (USB or network ADB)
+adb install -r -g app/build/outputs/apk/debug/app-debug.apk
+```
+
+Then launch it from the TV launcher, or fire a search directly:
+
+```bash
+# Query-carrying search (seeds results immediately)
+adb shell am start -a android.intent.action.SEARCH \
+  -n org.opentvsearch/.ui.SearchActivity --es query "your query"
+
+# Query-less launch (opens straight into voice input)
+adb shell am start -a android.intent.action.SEARCH -n org.opentvsearch/.ui.SearchActivity
+```
+
+To map it to a remote button, use a remapper (e.g. Button Mapper) to fire an `ACTION_SEARCH`
+intent at `org.opentvsearch/.ui.SearchActivity`. Note: the dedicated Assistant/mic button on a
+stock Google TV remote is system-bound to Google Assistant and **cannot** be intercepted by any
+app — use a remappable button or the generic search key.
 
 ## Architecture
 
-Everything content can come from implements one interface — the seam the design is
-built around:
-
 ```
-core/search/
-  SearchSource.kt      # the ONE extension point (id, label, capability, search())
-  SearchResult.kt      # unified hit: INLINE (resolved item) or HANDOFF (opens app)
-  SearchAggregator.kt  # parallel fan-out to all enabled sources, timeout, merge/rank
-
-sources/
-  tvprovider/  TvProviderSearchSource   # reads other apps' searchable rows (READ_TV_LISTINGS)
-  jellyfin/    JellyfinSearchSource      # example open-app API adapter (/Search/Hints)
-  handoff/     DeepLinkHandoffSource      # opens closed apps pre-filled with the query
-
-core/apps/     InstalledAppDetector       # LEANBACK_LAUNCHER enumeration + recommended-app pinning
-core/settings/ SettingsRepository         # DataStore prefs incl. "voice on launch"
-ui/            SearchActivity (exported, searchable, voice) + SearchViewModel
+SearchActivity (Compose for TV)
+  └─ SearchViewModel ── SettingsRepository (DataStore: voiceOnLaunch)
+       └─ SearchAggregator  (parallel fan-out + per-source timeout + merge/rank)
+            ├─ TvProviderSearchSource     READ_TV_LISTINGS → preview/watch_next rows (INLINE)
+            ├─ DeepLinkHandoffSource(×N)  per installed recommended app (HANDOFF)
+            └─ JellyfinSearchSource       (optional server source, WIP)
 ```
 
-Adding a new source = implement `SearchSource`, register it. That's it.
+- **`SearchSource`** — common interface (`search(query): List<SearchResult>`, a capability flag).
+- **`SearchResult`** — `kind = INLINE` (playable deep-link) or `HANDOFF` (opens an app).
+- **`InstalledAppDetector.RECOMMENDED`** — curated registry mapping each known content app to a
+  device-tested hand-off strategy; recommended apps are pinned to the top of the source list.
+- **`HandoffStrategy`** — `URL_TEMPLATE`, `ACTION_SEARCH_COMPONENT` (targets a specific search
+  activity), `ACTION_SEARCH`, `GMS_SEARCH_ACTION`, or `LAUNCH_ONLY`.
 
-## Features (target v1)
-
-- Type **or voice** search; **toggle** to auto-fire voice on app launch.
-- Exported, searchable `SearchActivity` → mappable to a remote button (Button Mapper,
-  or the system search key) via `ACTION_SEARCH`.
-- Configurable source list; installed content apps auto-detected, recommended ones
-  (Stremio, Netflix, Nova, Jellyfin, Kodi, YouTube, Plex) **pinned on top**.
-- Real inline results from TV-Provider rows + configured open apps; deep-link hand-off
-  for the rest.
-- No telemetry. No crash-phone-home. Clean Apache-2.0.
+DI is Hilt; async is Kotlin coroutines/Flow; UI is Jetpack Compose for TV.
 
 ## Roadmap
 
-- [ ] `TvProviderSearchSource`: query `preview_programs` + `watch_next_programs`, map
-      `COLUMN_INTENT_URI` → launch intent, feature-gate at API 26.
-- [ ] Compose-for-TV `SearchScreen`: query field + D-pad result grid, INLINE/HANDOFF
-      cards, `startActivity(result.launch)` on click.
-- [ ] Wire `SearchViewModel` + sources via Hilt; voice-on-launch hook in `SearchActivity`.
-- [ ] `JellyfinSearchSource` (`/Search/Hints`) and a Stremio addon source.
-- [ ] Source-config + pinning settings UI backed by `InstalledAppDetector`.
-- [ ] Verify each recommended app's hand-off strategy against a real installed APK.
-- [ ] On-device D-pad QA.
+- [x] M1 — cross-app search core, TV-Provider source, honest hand-off, voice, TV UI
+- [ ] **M2 — Settings screen**: toggle voice-on-launch, enable/disable sources, reorder/pin apps
+- [ ] Sectioned result rows (per-source `TvLazyRow`) + immersive header
+- [ ] App-icon posters on hand-off cards
+- [ ] More verified per-app search strategies (community-contributed)
 
-## Build
+## Contributing
 
-Requires Android Studio + Android SDK (compileSdk 35). Open the project in Android
-Studio — it will regenerate the Gradle wrapper (`gradlew` + `gradle-wrapper.jar`) and
-sync automatically on first open. Then run the `app` config on an Android TV
-device/emulator (API 26+ for the TV-Provider source).
+PRs and issues welcome. The most valuable contributions right now are **device-tested per-app
+search strategies**: pick an app, probe it (`adb shell dumpsys package <pkg> | grep -i search`),
+fire a query (`am start -a android.intent.action.SEARCH -n <pkg>/<activity> --es query "test"`),
+**screenshot to confirm the query actually lands** (not just that the app opened), and add/adjust
+its entry in `InstalledAppDetector.RECOMMENDED` with a note on what you verified.
 
-```
-./gradlew :app:assembleDebug     # build
-./gradlew :app:testDebugUnitTest # unit tests (SearchAggregator ranking/dedup)
-```
+Please keep the honesty rule: never ship a query-carrying strategy that hasn't been confirmed on
+real hardware. A wrong strategy that silently opens an app to its home screen is worse than an
+honest launch-only card.
 
 ## License
 
-Apache-2.0. Intentionally free of GPL-encumbered dependencies so anyone can install
-and redistribute.
+[MIT](LICENSE).
