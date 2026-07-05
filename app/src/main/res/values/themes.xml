@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      Launch/host theme for the (Compose-hosted) SearchActivity. We use the framework's
+      dark, no-action-bar Material theme (API 21+) so we don't pull in the extra
+      com.google.android.material XML library — the actual UI theming is done in Compose
+      via OpenTvSearchTheme (androidx.tv.material3).
+    -->
+    <style name="Theme.OpenTVSearch" parent="@android:style/Theme.Material.NoActionBar" />
+</resources>

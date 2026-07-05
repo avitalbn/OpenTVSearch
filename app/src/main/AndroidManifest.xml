@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!--
+      READ_TV_LISTINGS: public runtime ("dangerous") permission that grants read
+      access to other apps' TV-Provider rows that are marked COLUMN_SEARCHABLE=1
+      (preview_programs + watch_next_programs). This is the ONLY supported way to
+      read content published by other installed apps. Confirmed against AOSP
+      TvProvider source. See README "Platform reality".
+    -->
+    <uses-permission android:name="android.permission.READ_TV_LISTINGS" />
+
+    <!-- Voice search input -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-feature android:name="android.hardware.microphone" android:required="false" />
+
+    <!-- Not required on Android TV; declared so the app installs on TV devices. -->
+    <uses-feature android:name="android.software.leanback" android:required="true" />
+    <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
+
+    <!--
+      Package visibility (Android 11+): we enumerate installed content apps to build
+      the configurable/pinned source list and to fire search deep-links into them.
+    -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.SEARCH" />
+        </intent>
+        <intent>
+            <action android:name="com.google.android.gms.actions.SEARCH_ACTION" />
+        </intent>
+    </queries>
+
+    <application
+        android:allowBackup="true"
+        android:banner="@drawable/app_banner"
+        android:icon="@drawable/app_banner"
+        android:label="@string/app_name"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.OpenTVSearch"
+        android:name=".OpenTvSearchApp">
+
+        <!--
+          SearchActivity is the single entry point and is EXPORTED + searchable so a
+          remote button (via Button Mapper etc.) or the system search key can launch
+          it directly with ACTION_SEARCH.
+        -->
+        <activity
+            android:name=".ui.SearchActivity"
+            android:exported="true"
+            android:launchMode="singleTop"
+            android:theme="@style/Theme.OpenTVSearch">
+
+            <!-- Launcher entry (TV home + fallback) -->
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+
+            <!-- Remote-button / global search entry -->
+            <intent-filter>
+                <action android:name="android.intent.action.SEARCH" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="com.google.android.gms.actions.SEARCH_ACTION" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+
+            <meta-data
+                android:name="android.app.searchable"
+                android:resource="@xml/searchable" />
+        </activity>
+
+    </application>
+</manifest>
