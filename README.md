@@ -64,9 +64,11 @@ manifest often ignores an externally-supplied query. Verified on Skyworth HP4609
 | App | External search | Behavior |
 |-----|-----------------|----------|
 | **Nova Video Player** (`org.courville.nova`) | ✅ Real search | Opens its query browser with your term and shows library results |
-| **Stremio** (`com.stremio.one`) | ⚠️ Launch-only | Ignores external queries; opens to home. Card = *"Open Stremio to search"* |
-| **Netflix** (`com.netflix.ninja`) | ⚠️ Launch-only | Declares no search deep-link; card opens the app |
-| **YouTube TV** (`com.google.android.youtube.tv`) | ⚠️ Launch-only | No external search intent; card opens the app |
+| **SmartTube** (`org.smarttube.stable`) | ✅ Real search | Opens a full "Search results for &lt;query&gt;" YouTube page (via the `vnd.youtube://results` scheme, package-pinned) |
+| **Stremio** (`com.stremio.one`) | ⚠️ Launch-only | Declares `ACTION_SEARCH` + `stremio://search` but ignores the query (JS-internal search); opens to home. Card = *"Open Stremio to search"* |
+| **Netflix** (`com.netflix.ninja`) | ⚠️ Launch-only | No `ACTION_SEARCH`, no `/search` deep-link; card opens the app |
+| **כאן 11 / Kan** (`com.applicaster.il.ch1`) | ⚠️ Launch-only | Applicaster app; only `MAIN`, no search intent/scheme; card opens the app |
+| **YouTube TV** (`com.google.android.youtube.tv`) | ⚠️ Launch-only | No external search intent; `vnd.youtube` search scheme is claimed by SmartTube when both are installed |
 | **Jellyfin / Kodi / Plex** | ⚠️ Launch-only* | Conservative default until verified on a device |
 | **Any app publishing TV-Provider rows** | ✅ via `READ_TV_LISTINGS` | Real posters + play deep-links, no per-app code needed |
 

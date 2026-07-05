@@ -50,9 +50,21 @@ class InstalledAppDetector(
                 HandoffStrategy.ACTION_SEARCH_COMPONENT,
                 searchActivity = "com.archos.mediacenter.video.browser.QueryBrowserActivityVideo",
             ),
+            // SmartTube: real YouTube search via the vnd.youtube results scheme (VERIFIED — the
+            // intent must be package-pinned; the scheme is shared with the stock YouTube app).
+            // Renders a full "Search results for <q>" page.
+            RecommendedApp(
+                "org.smarttube.stable", "SmartTube",
+                HandoffStrategy.URL_TEMPLATE,
+                urlTemplate = "vnd.youtube://results?search_query={q}",
+            ),
             // Ignore external queries / no external search path -> honest launch-only (VERIFIED).
+            // Stremio: declares ACTION_SEARCH + stremio://search but ignores the query (JS-internal
+            // search only) -> home. Netflix: no ACTION_SEARCH and no /search deep-link. Kan (כאן,
+            // Applicaster): only MAIN, no search/scheme at all. YouTube TV: no external search.
             RecommendedApp("com.stremio.one", "Stremio", HandoffStrategy.LAUNCH_ONLY),
             RecommendedApp("com.netflix.ninja", "Netflix", HandoffStrategy.LAUNCH_ONLY),
+            RecommendedApp("com.applicaster.il.ch1", "כאן 11 (Kan)", HandoffStrategy.LAUNCH_ONLY),
             RecommendedApp("com.google.android.youtube.tv", "YouTube", HandoffStrategy.LAUNCH_ONLY),
             // Unverified on this device -> conservative launch-only until tested.
             RecommendedApp("org.jellyfin.androidtv", "Jellyfin", HandoffStrategy.LAUNCH_ONLY),
