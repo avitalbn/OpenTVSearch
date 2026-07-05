@@ -73,6 +73,7 @@ class SearchActivity : ComponentActivity() {
                     onSubmit = viewModel::submit,
                     onVoice = ::startVoiceFlow,
                     onResultClick = ::launchResult,
+                    onOpenSettings = ::openSettings,
                 )
             }
         }
@@ -155,6 +156,11 @@ class SearchActivity : ComponentActivity() {
         }
         runCatching { voiceLauncher.launch(intent) }
             .onFailure { Toast.makeText(this, "Voice search unavailable", Toast.LENGTH_SHORT).show() }
+    }
+
+    private fun openSettings() {
+        runCatching { startActivity(Intent(this, SettingsActivity::class.java)) }
+            .onFailure { Toast.makeText(this, "Couldn't open Settings", Toast.LENGTH_SHORT).show() }
     }
 
     private fun launchResult(result: org.opentvsearch.core.search.SearchResult) {

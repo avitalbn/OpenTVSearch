@@ -65,6 +65,7 @@ fun SearchScreen(
     onSubmit: () -> Unit,
     onVoice: () -> Unit,
     onResultClick: (SearchResult) -> Unit,
+    onOpenSettings: () -> Unit,
 ) {
     val firstItemFocus = remember { FocusRequester() }
 
@@ -95,6 +96,7 @@ fun SearchScreen(
             )
             Button(onClick = onSubmit) { Text("Search") }
             Button(onClick = onVoice) { Text("\uD83C\uDFA4 Voice") }
+            Button(onClick = onOpenSettings) { Text("\u2699 Settings") }
         }
 
         when {

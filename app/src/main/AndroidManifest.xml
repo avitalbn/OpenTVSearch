@@ -80,5 +80,14 @@
                 android:resource="@xml/searchable" />
         </activity>
 
+        <!--
+          Settings screen: internal-only (launched from SearchScreen's Settings button), so it is
+          NOT exported and has no launcher/search intent filters.
+        -->
+        <activity
+            android:name=".ui.SettingsActivity"
+            android:exported="false"
+            android:theme="@style/Theme.OpenTVSearch" />
+
     </application>
 </manifest>

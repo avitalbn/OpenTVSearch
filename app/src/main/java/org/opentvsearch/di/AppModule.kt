@@ -7,11 +7,13 @@ import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import org.opentvsearch.core.apps.InstalledAppDetector
 import org.opentvsearch.core.search.SearchAggregator
 import org.opentvsearch.core.search.SearchSource
 import org.opentvsearch.core.settings.SettingsRepository
+import org.opentvsearch.core.sources.SourceCatalog
 import org.opentvsearch.sources.handoff.DeepLinkHandoffSource
 import org.opentvsearch.sources.handoff.HandoffTarget
 import org.opentvsearch.sources.tvprovider.TvProviderSearchSource
@@ -56,18 +58,27 @@ object AppModule {
     fun provideSearchAggregator(
         tvProvider: TvProviderSearchSource,
         detector: InstalledAppDetector,
+        settings: SettingsRepository,
     ): SearchAggregator = SearchAggregator(
-        sourcesProvider = { buildEnabledSources(tvProvider, detector) },
+        sourcesProvider = { buildEnabledSources(tvProvider, detector, settings) },
     )
 
     /**
-     * Builds the live source list: Tv-Provider first, then a hand-off target for each installed
-     * recommended app. The package enumeration touches [android.content.pm.PackageManager], so it
-     * runs on [Dispatchers.IO].
+     * Builds the live source list: Tv-Provider plus a hand-off target for each installed
+     * recommended app, then applies the user's persisted settings — DROP any source whose id is
+     * in `disabledSourceIds`, and SORT the survivors by `sourceOrder` (ids absent from the saved
+     * order keep their natural position after the ordered ones; see
+     * [SourceCatalog.selectEnabledOrdered]).
+     *
+     * The aggregator's INLINE-before-HANDOFF ranking is UNCHANGED; the user order is only the
+     * tie-break (i.e. the order among hand-off sources). Settings are read with `.first()`; this
+     * runs on [Dispatchers.IO] and is rebuilt per query, so changed settings apply on the next
+     * search without a restart. Package enumeration touches [android.content.pm.PackageManager].
      */
     private suspend fun buildEnabledSources(
         tvProvider: TvProviderSearchSource,
         detector: InstalledAppDetector,
+        settings: SettingsRepository,
     ): List<SearchSource> = withContext(Dispatchers.IO) {
         val installed = runCatching { detector.installedLeanbackPackages() }
             .getOrDefault(emptyList())
@@ -87,9 +98,13 @@ object AppModule {
                 )
             }
 
-        buildList {
+        val candidates = buildList<SearchSource> {
             add(tvProvider)
             addAll(handoffSources)
         }
+
+        val disabledIds = settings.disabledSourceIds.first()
+        val order = settings.sourceOrder.first()
+        SourceCatalog.selectEnabledOrdered(candidates, disabledIds, order) { it.id }
     }
 }
