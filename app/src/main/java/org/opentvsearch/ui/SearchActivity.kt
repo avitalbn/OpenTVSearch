@@ -18,6 +18,9 @@ import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
+import org.opentvsearch.core.apps.InstalledAppDetector
+import org.opentvsearch.sources.handoff.HandoffIntentFactory
+import org.opentvsearch.sources.handoff.HandoffTarget
 import org.opentvsearch.sources.tvprovider.TvProviderSearchSource
 import org.opentvsearch.ui.theme.OpenTvSearchTheme
 
@@ -74,6 +77,7 @@ class SearchActivity : ComponentActivity() {
                     onVoice = ::startVoiceFlow,
                     onResultClick = ::launchResult,
                     onOpenSettings = ::openSettings,
+                    onLaunchApp = ::launchContentApp,
                 )
             }
         }
@@ -169,6 +173,46 @@ class SearchActivity : ComponentActivity() {
                 Toast.makeText(this, "Couldn't open ${result.sourceLabel}", Toast.LENGTH_SHORT).show()
             }
     }
+
+    /**
+     * Discover-tile action. When [withQuery] (the app is searchable) and the box has text, build
+     * the app's REAL search intent via the shared [HandoffIntentFactory] (same verified strategies
+     * as the result cards); otherwise just open the app via its leanback launch intent. A null /
+     * unresolvable intent is reported with a Toast rather than crashing.
+     */
+    private fun launchContentApp(packageName: String, withQuery: Boolean) {
+        val query = viewModel.state.value.query.trim()
+        val recommended = InstalledAppDetector.RECOMMENDED.firstOrNull { it.packageName == packageName }
+
+        val intent: Intent? = if (withQuery && query.isNotBlank() && recommended != null) {
+            HandoffIntentFactory.create(
+                HandoffTarget(
+                    packageName = recommended.packageName,
+                    label = recommended.label,
+                    strategy = recommended.handoffStrategy,
+                    urlTemplate = recommended.urlTemplate,
+                    searchActivity = recommended.searchActivity,
+                ),
+                query,
+            )
+        } else {
+            leanbackLaunchIntent(packageName)
+        }
+
+        val toStart = intent?.apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) }
+        if (toStart == null) {
+            Toast.makeText(this, "Couldn't open ${recommended?.label ?: packageName}", Toast.LENGTH_SHORT).show()
+            return
+        }
+        runCatching { startActivity(toStart) }
+            .onFailure {
+                Toast.makeText(this, "Couldn't open ${recommended?.label ?: packageName}", Toast.LENGTH_SHORT).show()
+            }
+    }
+
+    private fun leanbackLaunchIntent(packageName: String): Intent? =
+        packageManager.getLeanbackLaunchIntentForPackage(packageName)
+            ?: packageManager.getLaunchIntentForPackage(packageName)
 
     private fun hasPermission(permission: String): Boolean =
         ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED

@@ -9,6 +9,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import org.opentvsearch.core.apps.ContentAppRepository
+import org.opentvsearch.core.apps.ContentAppTile
 import org.opentvsearch.core.search.SearchAggregator
 import org.opentvsearch.core.search.SearchResult
 import org.opentvsearch.core.settings.SettingsRepository
@@ -23,12 +25,20 @@ import javax.inject.Inject
 class SearchViewModel @Inject constructor(
     private val aggregator: SearchAggregator,
     private val settings: SettingsRepository,
+    private val contentApps: ContentAppRepository,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(SearchUiState())
     val state: StateFlow<SearchUiState> = _state.asStateFlow()
 
     private var searchJob: Job? = null
+
+    init {
+        viewModelScope.launch {
+            val apps = contentApps.loadContentApps()
+            _state.value = _state.value.copy(contentApps = apps)
+        }
+    }
 
     fun onQueryChange(query: String) {
         _state.value = _state.value.copy(query = query)
@@ -61,4 +71,5 @@ data class SearchUiState(
     val isLoading: Boolean = false,
     val results: List<SearchResult> = emptyList(),
     val error: String? = null,
+    val contentApps: List<ContentAppTile> = emptyList(),
 )

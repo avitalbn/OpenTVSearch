@@ -1,8 +1,6 @@
 package org.opentvsearch.sources.handoff
 
 import android.content.Intent
-import android.net.Uri
-import androidx.core.net.toUri
 import org.opentvsearch.core.search.ContentType
 import org.opentvsearch.core.search.ResultKind
 import org.opentvsearch.core.search.SearchResult
@@ -36,7 +34,9 @@ class DeepLinkHandoffSource(
     override val capability = SourceCapability.HANDOFF_ONLY
 
     override suspend fun search(query: String): List<SearchResult> {
-        val intent = buildIntent(query) ?: return emptyList()
+        // Intent building lives in the shared HandoffIntentFactory so the Discover home reuses the
+        // exact same device-verified per-app strategies (do NOT inline it back here).
+        val intent = HandoffIntentFactory.create(target, query) ?: return emptyList()
         // Honest labeling: query-carrying strategies say "Search X"; launch-only says
         // "Open X to search" so the user knows they'll finish the search inside the app.
         val carriesQuery = target.strategy != HandoffStrategy.LAUNCH_ONLY
@@ -56,41 +56,6 @@ class DeepLinkHandoffSource(
                 launch = intent,
             )
         )
-    }
-
-    private fun buildIntent(query: String): Intent? = when (target.strategy) {
-        HandoffStrategy.URL_TEMPLATE ->
-            target.urlTemplate?.let {
-                Intent(Intent.ACTION_VIEW, it.replace("{q}", Uri.encode(query)).toUri())
-                    .setPackage(target.packageName)
-            }
-
-        // Targets a SPECIFIC search activity (component), not just the package, because a
-        // bare ACTION_SEARCH + setPackage resolves to an arbitrary/main activity and the
-        // query is dropped. The component must be an activity that consumes SearchManager.QUERY.
-        HandoffStrategy.ACTION_SEARCH_COMPONENT ->
-            target.searchActivity?.let { activity ->
-                Intent(Intent.ACTION_SEARCH).apply {
-                    setClassName(target.packageName, activity)
-                    putExtra("query", query) // android.app.SearchManager.QUERY
-                }
-            }
-
-        // Legacy package-scoped ACTION_SEARCH. Kept for apps that genuinely honor it without a
-        // known component, but prefer ACTION_SEARCH_COMPONENT — verify on device before using.
-        HandoffStrategy.ACTION_SEARCH ->
-            Intent(Intent.ACTION_SEARCH)
-                .setPackage(target.packageName)
-                .putExtra("query", query)
-
-        HandoffStrategy.GMS_SEARCH_ACTION ->
-            Intent("com.google.android.gms.actions.SEARCH_ACTION")
-                .setPackage(target.packageName)
-                .putExtra("query", query)
-
-        // No working external-query path: just open the app so the user can search inside it.
-        HandoffStrategy.LAUNCH_ONLY ->
-            target.launchIntent()
     }
 }
 

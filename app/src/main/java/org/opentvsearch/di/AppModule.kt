@@ -9,6 +9,7 @@ import dagger.hilt.components.SingletonComponent
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
+import org.opentvsearch.core.apps.ContentAppRepository
 import org.opentvsearch.core.apps.InstalledAppDetector
 import org.opentvsearch.core.search.SearchAggregator
 import org.opentvsearch.core.search.SearchSource
@@ -47,6 +48,13 @@ object AppModule {
     @Singleton
     fun provideInstalledAppDetector(@ApplicationContext context: Context): InstalledAppDetector =
         InstalledAppDetector(context)
+
+    @Provides
+    @Singleton
+    fun provideContentAppRepository(
+        @ApplicationContext context: Context,
+        detector: InstalledAppDetector,
+    ): ContentAppRepository = ContentAppRepository(context, detector)
 
     @Provides
     @Singleton

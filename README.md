@@ -45,11 +45,18 @@ results open an app.
   per-source timeout, and results are merged (playable/INLINE results ranked ahead of hand-offs).
 - **Cross-app content via `READ_TV_LISTINGS`.** Reads the TV Provider `preview_programs` /
   `watch_next_programs` tables — the same home-screen recommendation rows Google TV's own search
-  uses — so results carry real posters and play deep-links where apps publish them.
+  uses — so results carry real posters and play deep-links where apps publish them. (Note: these
+  tables are only populated when a launcher that consumes recommendation channels is active —
+  typically the stock Google TV home. On a custom launcher they may be empty.)
+- **Discover home.** When opened with no query, OpenTVSearch shows a "Your content apps" rail of
+  **banner tiles** for your installed content apps (recommended pinned first), each with a
+  capability chip ("🔍 Searchable" vs "Opens app"). This surface is launcher-independent (built from
+  `PackageManager` banners/icons) so it's never empty. Clicking a tile fires the app's real search
+  when it's searchable and a query is typed, or launches the app otherwise.
 - **Honest per-app hand-off.** For apps whose catalog can't be read, OpenTVSearch offers a card
-  that opens that app. Where an app genuinely honors an external query (e.g. **Nova**, via its
-  search activity) the card runs a real in-app search; where it doesn't, the card is labeled
-  *"Open X to search"* rather than pretending. (See [App support](#app-support).)
+  that opens that app. Where an app genuinely honors an external query (e.g. **Nova**, **SmartTube**)
+  the card runs a real in-app search; where it doesn't, the card is labeled *"Open X to search"*
+  rather than pretending. (See [App support](#app-support).)
 - **Voice-first, remote-mappable.** Launch it via a remote "search" button or the system search
   key and it opens straight into voice input; an on-screen mic works too. An optional
   *voice-on-launch* setting fires the recognizer as soon as the app opens.
@@ -134,9 +141,11 @@ DI is Hilt; async is Kotlin coroutines/Flow; UI is Jetpack Compose for TV.
 ## Roadmap
 
 - [x] M1 — cross-app search core, TV-Provider source, honest hand-off, voice, TV UI
-- [ ] **M2 — Settings screen**: toggle voice-on-launch, enable/disable sources, reorder/pin apps
+- [x] M2 — Settings screen: toggle voice-on-launch, enable/disable sources, reorder/pin apps
+- [x] Discover home — launcher-independent content-app banner rail (search or launch per tile)
+- [x] Verified per-app search: Nova + SmartTube (real in-app search); others honest launch-only
+- [ ] TV-Provider content rows on the Discover home (when the tables are populated)
 - [ ] Sectioned result rows (per-source `TvLazyRow`) + immersive header
-- [ ] App-icon posters on hand-off cards
 - [ ] More verified per-app search strategies (community-contributed)
 
 ## Contributing

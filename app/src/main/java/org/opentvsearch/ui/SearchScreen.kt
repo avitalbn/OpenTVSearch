@@ -66,6 +66,7 @@ fun SearchScreen(
     onVoice: () -> Unit,
     onResultClick: (SearchResult) -> Unit,
     onOpenSettings: () -> Unit,
+    onLaunchApp: (packageName: String, withQuery: Boolean) -> Unit,
 ) {
     val firstItemFocus = remember { FocusRequester() }
 
@@ -113,24 +114,34 @@ fun SearchScreen(
                 Text("No results for \"${state.query}\".")
         }
 
-        TvLazyVerticalGrid(
-            columns = TvGridCells.Fixed(5),
-            state = rememberTvLazyGridState(),
-            modifier = Modifier.fillMaxSize(),
-            // Reserve room so the focused card (scaled up to 1.1×) is never clipped at the edges.
-            contentPadding = PaddingValues(top = 24.dp, bottom = 24.dp, start = 8.dp, end = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(20.dp),
-            verticalArrangement = Arrangement.spacedBy(20.dp),
-        ) {
-            itemsIndexed(
-                items = state.results,
-                key = { _, r -> "${r.sourceId}:${r.id}" },
-            ) { index, result ->
-                ResultCard(
-                    result = result,
-                    onClick = { onResultClick(result) },
-                    modifier = if (index == 0) Modifier.focusRequester(firstItemFocus) else Modifier,
-                )
+        // Idle (no query typed AND nothing to show) → the always-populated Discover home instead of
+        // an empty void; any active/typed query switches back to the result grid unchanged.
+        val showDiscover = state.query.isBlank() && state.results.isEmpty()
+        if (showDiscover) {
+            DiscoverRow(
+                apps = state.contentApps,
+                onLaunchApp = onLaunchApp,
+            )
+        } else {
+            TvLazyVerticalGrid(
+                columns = TvGridCells.Fixed(5),
+                state = rememberTvLazyGridState(),
+                modifier = Modifier.fillMaxSize(),
+                // Reserve room so the focused card (scaled up to 1.1×) is never clipped at the edges.
+                contentPadding = PaddingValues(top = 24.dp, bottom = 24.dp, start = 8.dp, end = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(20.dp),
+                verticalArrangement = Arrangement.spacedBy(20.dp),
+            ) {
+                itemsIndexed(
+                    items = state.results,
+                    key = { _, r -> "${r.sourceId}:${r.id}" },
+                ) { index, result ->
+                    ResultCard(
+                        result = result,
+                        onClick = { onResultClick(result) },
+                        modifier = if (index == 0) Modifier.focusRequester(firstItemFocus) else Modifier,
+                    )
+                }
             }
         }
     }
