@@ -54,6 +54,27 @@ Remote-button mapping:
 13. Using Button Mapper (or the system search key), fire an ACTION_SEARCH intent at the app;
     confirm SearchActivity opens and (if a query extra is present) searches immediately.
 
+## Voice from remote
+What now triggers the voice recognizer:
+- **In-app mic button** — the "🎤 Voice" button in `SearchScreen` (existing).
+- **Query-less search launch** — being launched via `ACTION_SEARCH`, GMS `SEARCH_ACTION`,
+  or `ACTION_ASSIST` with NO query extra fires voice immediately (the remote asked to start
+  a search, so we go straight to voice). A launch WITH a query still just runs that query.
+- **`KEYCODE_SEARCH`** — the generic search key, while the app is foreground, fires voice.
+- **Voice-on-launch pref** — a normal launcher open still fires voice only when the
+  `voiceOnLaunch` DataStore pref is on (unchanged).
+
+Voice fires **at most once** per `onCreate` (a single `shouldAutoLaunchVoice(...)` decision),
+and never when a query is present.
+
+**Platform caveat (hard limit):** the dedicated Assistant/mic button on stock Google TV
+remotes is bound to Google Assistant at the SYSTEM level. No foreground app can intercept it
+(`KEYCODE_ASSIST` / the Assistant button never reaches the app). The triggers above are the
+only realistic ones a third-party app can receive.
+
+**QA step:** map a remote button to "search" (Button Mapper) or otherwise fire `ACTION_SEARCH`
+with NO query extra and confirm the speech recognizer opens on launch. Repeat with `ACTION_ASSIST`.
+
 ## Known M1 gaps (by design — next milestones)
 - No settings UI yet for the voice-on-launch toggle or source enable/pin ordering
   (SettingsRepository + InstalledAppDetector.RECOMMENDED exist; UI is M2).

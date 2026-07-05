@@ -6,6 +6,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
 import android.speech.RecognizerIntent
+import android.view.KeyEvent
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -63,12 +64,19 @@ class SearchActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Handle an incoming ACTION_SEARCH / GMS SEARCH_ACTION (remote button / global search).
+        // Handle an incoming ACTION_SEARCH / GMS SEARCH_ACTION / ACTION_ASSIST
+        // (remote button / global search / assistant-style "search this app").
         val incomingQuery = when (intent?.action) {
-            Intent.ACTION_SEARCH, "com.google.android.gms.actions.SEARCH_ACTION" ->
+            Intent.ACTION_SEARCH,
+            "com.google.android.gms.actions.SEARCH_ACTION",
+            Intent.ACTION_ASSIST ->
                 intent.getStringExtra(android.app.SearchManager.QUERY).orEmpty()
             else -> ""
         }
+
+        // "Launched as a search intent" = the launcher/remote-mapper asked us to start a
+        // search (with or without a query), as opposed to a plain launcher open.
+        val isSearchIntent = intent?.action in SEARCH_INTENT_ACTIONS
 
         setContent {
             OpenTvSearchTheme {
@@ -93,12 +101,25 @@ class SearchActivity : ComponentActivity() {
             tvListingsPermission.launch(TvProviderSearchSource.PERMISSION_READ_TV_LISTINGS)
         }
 
-        // Voice-on-launch: only when enabled AND we weren't handed an explicit query.
-        if (incomingQuery.isBlank()) {
-            lifecycleScope.launch {
-                if (viewModel.voiceOnLaunch()) startVoiceFlow()
+        lifecycleScope.launch {
+            val voiceOnLaunchPref = viewModel.voiceOnLaunch()
+            if (shouldAutoLaunchVoice(
+                    isSearchIntent = isSearchIntent,
+                    hasQuery = incomingQuery.isNotBlank(),
+                    voiceOnLaunchPref = voiceOnLaunchPref,
+                )
+            ) {
+                startVoiceFlow()
             }
         }
+    }
+
+    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
+        if (keyCode == KeyEvent.KEYCODE_SEARCH) {
+            startVoiceFlow()
+            return true
+        }
+        return super.onKeyDown(keyCode, event)
     }
 
     private fun startVoiceFlow() {
@@ -124,4 +145,19 @@ class SearchActivity : ComponentActivity() {
 
     private fun hasPermission(permission: String): Boolean =
         ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED
+}
+
+internal val SEARCH_INTENT_ACTIONS = setOf(
+    Intent.ACTION_SEARCH,
+    "com.google.android.gms.actions.SEARCH_ACTION",
+    Intent.ACTION_ASSIST,
+)
+
+internal fun shouldAutoLaunchVoice(
+    isSearchIntent: Boolean,
+    hasQuery: Boolean,
+    voiceOnLaunchPref: Boolean,
+): Boolean {
+    if (hasQuery) return false
+    return isSearchIntent || voiceOnLaunchPref
 }
