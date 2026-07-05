@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -32,6 +33,7 @@ class SearchViewModel @Inject constructor(
     val state: StateFlow<SearchUiState> = _state.asStateFlow()
 
     private var searchJob: Job? = null
+    private var debounceJob: Job? = null
 
     init {
         viewModelScope.launch {
@@ -40,8 +42,25 @@ class SearchViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Update the query text and QUICK-SEARCH automatically after a short debounce, so results
+     * appear as the user types without a manual Search press. A blank query cancels any pending
+     * search and clears results (returning to the Discover home). The keyboard's IME Search action
+     * and the Search button still call [submit] for an immediate search.
+     */
     fun onQueryChange(query: String) {
         _state.value = _state.value.copy(query = query)
+        debounceJob?.cancel()
+        if (query.isBlank()) {
+            // Cancel an in-flight search and clear results so the Discover home returns.
+            searchJob?.cancel()
+            _state.value = _state.value.copy(isLoading = false, results = emptyList(), error = null)
+            return
+        }
+        debounceJob = viewModelScope.launch {
+            delay(SEARCH_DEBOUNCE_MS)
+            submit()
+        }
     }
 
     /** Reads the persisted "fire voice recognizer on launch" toggle once. */
@@ -56,6 +75,7 @@ class SearchViewModel @Inject constructor(
     fun submit() {
         val q = _state.value.query.trim()
         if (q.isEmpty()) return
+        debounceJob?.cancel() // an explicit submit supersedes any pending debounced search
         searchJob?.cancel()
         searchJob = viewModelScope.launch {
             _state.value = _state.value.copy(isLoading = true, error = null)
@@ -63,6 +83,11 @@ class SearchViewModel @Inject constructor(
                 .onSuccess { _state.value = _state.value.copy(isLoading = false, results = it) }
                 .onFailure { _state.value = _state.value.copy(isLoading = false, error = it.message) }
         }
+    }
+
+    private companion object {
+        /** Debounce before auto-searching as the user types (quick-search feel without spamming). */
+        const val SEARCH_DEBOUNCE_MS = 350L
     }
 }
 

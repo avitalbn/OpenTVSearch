@@ -53,6 +53,7 @@ class DeepLinkHandoffSource(
                 sourceId = id,
                 sourceLabel = target.label,
                 kind = ResultKind.HANDOFF,
+                packageName = target.packageName,
                 launch = intent,
             )
         )

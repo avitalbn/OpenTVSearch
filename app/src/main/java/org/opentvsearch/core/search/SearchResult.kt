@@ -22,6 +22,8 @@ data class SearchResult(
     val sourceId: String,
     val sourceLabel: String,
     val kind: ResultKind,
+    /** Owning app package, when known — used to show the app icon on compact result tiles. */
+    val packageName: String? = null,
     /** Intent that launches this item (inline) or the app's search (handoff). */
     val launch: Intent,
 )

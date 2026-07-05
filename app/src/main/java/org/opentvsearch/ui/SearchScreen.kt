@@ -32,8 +32,10 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.tv.foundation.lazy.grid.TvGridCells
 import androidx.tv.foundation.lazy.grid.TvLazyVerticalGrid
@@ -124,13 +126,13 @@ fun SearchScreen(
             )
         } else {
             TvLazyVerticalGrid(
-                columns = TvGridCells.Fixed(5),
+                columns = TvGridCells.Fixed(2),
                 state = rememberTvLazyGridState(),
                 modifier = Modifier.fillMaxSize(),
-                // Reserve room so the focused card (scaled up to 1.1×) is never clipped at the edges.
-                contentPadding = PaddingValues(top = 24.dp, bottom = 24.dp, start = 8.dp, end = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(20.dp),
-                verticalArrangement = Arrangement.spacedBy(20.dp),
+                // Reserve room so the focused card (scaled up) is never clipped at the edges.
+                contentPadding = PaddingValues(top = 16.dp, bottom = 24.dp, start = 8.dp, end = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 itemsIndexed(
                     items = state.results,
@@ -215,15 +217,19 @@ private fun ResultCard(
 ) {
     val cardShape = RoundedCornerShape(12.dp)
     val colorScheme = MaterialTheme.colorScheme
+    val context = LocalContext.current
+    // Load the owning app's icon (compact tiles are icon-led like the Discover rail). Remembered
+    // per package; getApplicationIcon can throw if the package vanished, hence runCatching.
+    val appIcon = remember(result.packageName) {
+        result.packageName?.let {
+            runCatching { context.packageManager.getApplicationIcon(it) }.getOrNull()
+        }
+    }
     Surface(
         onClick = onClick,
-        // No fixed width: the grid cell drives the card width (~5 across on the 960dp canvas).
         modifier = modifier,
         shape = ClickableSurfaceDefaults.shape(cardShape),
-        // Keep the card DARK in both states (default + focused) so text stays readable. By
-        // default a clickable Surface flips to a light focusedContainerColor, which produced
-        // white text on a white background on focus. We signal focus via scale + border only,
-        // and pin container/content colors dark for every state.
+        // Pin colors dark in every state so focus never flips to white-on-white; focus = scale+border.
         colors = ClickableSurfaceDefaults.colors(
             containerColor = colorScheme.surfaceVariant,
             contentColor = colorScheme.onSurface,
@@ -232,8 +238,7 @@ private fun ResultCard(
             pressedContainerColor = colorScheme.surfaceVariant,
             pressedContentColor = colorScheme.onSurface,
         ),
-        // Obvious focus state required by TV UX: scale up + brand-colored border on focus.
-        scale = ClickableSurfaceDefaults.scale(focusedScale = 1.1f),
+        scale = ClickableSurfaceDefaults.scale(focusedScale = 1.05f),
         border = ClickableSurfaceDefaults.border(
             focusedBorder = Border(
                 border = BorderStroke(3.dp, colorScheme.primary),
@@ -241,68 +246,70 @@ private fun ResultCard(
             ),
         ),
     ) {
-        Column(modifier = Modifier.padding(8.dp)) {
+        // Compact HORIZONTAL tile: small artwork on the left, title + source on the right.
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
             Box(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(2f / 3f)
+                    .width(56.dp)
+                    .aspectRatio(1f)
                     .clip(RoundedCornerShape(8.dp))
-                    .background(MaterialTheme.colorScheme.surface),
+                    .background(colorScheme.surface),
                 contentAlignment = Alignment.Center,
             ) {
-                if (result.posterUri != null) {
-                    AsyncImage(
+                when {
+                    // INLINE rows may carry real poster art — prefer it.
+                    result.posterUri != null -> AsyncImage(
                         model = result.posterUri,
                         contentDescription = result.title,
                         modifier = Modifier.fillMaxSize(),
                     )
-                } else {
-                    // Hand-off/deep-link cards carry no poster. SearchResult exposes no package
-                    // name, so instead of a bare first letter we show a branded, centered source
-                    // label on a theme-colored tile so the card reads as intentional.
-                    PlaceholderTile(label = result.sourceLabel)
+                    // Otherwise show the owning app's icon (hand-off cards, iconful and branded).
+                    appIcon != null -> AsyncImage(
+                        model = appIcon,
+                        contentDescription = result.sourceLabel,
+                        modifier = Modifier.fillMaxSize(0.8f),
+                    )
+                    // Last resort: the source's first letter.
+                    else -> Text(
+                        text = result.sourceLabel.take(1).uppercase(),
+                        style = MaterialTheme.typography.titleLarge,
+                        color = colorScheme.onSurfaceVariant,
+                    )
                 }
             }
 
-            Spacer(Modifier.height(8.dp))
-
-            KindBadge(result.kind)
-
-            Spacer(Modifier.height(4.dp))
-
-            Text(
-                text = result.title,
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 2,
-            )
-            Text(
-                text = result.sourceLabel,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-            )
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                Text(
+                    text = result.title,
+                    style = MaterialTheme.typography.titleSmall,
+                    color = colorScheme.onSurface,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    KindBadge(result.kind)
+                    Text(
+                        text = result.sourceLabel,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
         }
-    }
-}
-
-@OptIn(ExperimentalTvMaterial3Api::class)
-@Composable
-private fun PlaceholderTile(label: String) {
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.surfaceVariant),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
-            maxLines = 2,
-            modifier = Modifier.padding(horizontal = 8.dp),
-        )
     }
 }
 

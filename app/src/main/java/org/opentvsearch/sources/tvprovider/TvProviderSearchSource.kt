@@ -160,6 +160,7 @@ class TvProviderSearchSource(
                 sourceId = sourceId,
                 sourceLabel = sourceLabel,
                 kind = ResultKind.INLINE,
+                packageName = row.packageName?.takeIf { it.isNotBlank() },
                 launch = launch,
             )
         }
